@@ -1,4 +1,4 @@
-# 🎙️ AnonyVox — AI Voice Morphing & Cryptographic Redaction Engine
+# 🎙️ AnonyVox — Real-Time AI Voice Changer
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.11%20%7C%203.12%20%7C%203.13-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Versions" />
@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge" alt="License" />
 </p>
 
-AnonyVox is a real-time, desktop audio application built in Python that wraps Retrieval-based Voice Conversion (RVC), a spectral inversion (frequency mirroring) DSP engine, and a zero-latency semantic redaction scrambler into a single, cohesive, premium dark-theme utility.
+AnonyVox is a real-time, desktop audio application built in Python that wraps Retrieval-based Voice Conversion (RVC) and a low-latency DSP vocal effects matrix into a single, cohesive, premium dark-theme utility.
 
 ---
 
@@ -24,9 +24,7 @@ AnonyVox is a real-time, desktop audio application built in Python that wraps Re
    * Flips AC frequency coefficients upside down, then reconstructs the signal with inverse `rfft` (`irfft`) to create an alien-sounding privacy scrambled voice.
 4. **Vocal Effects Matrix**
    * Real-time vocal DSP processing including **Ring Modulation** (carrier-mixed wave), **Tremolo** (LFO-driven amplitude modulation), and **Vocal Overdrive Distortion**.
-5. **AI Semantic Redaction ("Hold to Scramble")**
-   * Click-and-hold vocal scramble button. Bypasses the inference pipeline instantly to inject a phase-inverted carrier-mixed wave, creating a heavy sci-fi privacy blur.
-6. **Premium Cyberpunk Dashboard**
+5. **Premium Cyberpunk Dashboard**
    * Neon-cyan (`#06b6d4`) and dark-slate (`#0f172a`) UI aesthetic.
    * Live reactive Canvas-based waveform visualizer running at 33 FPS with bezier curve interpolation.
 
@@ -38,7 +36,7 @@ AnonyVox is a real-time, desktop audio application built in Python that wraps Re
 graph TD
     A[Microphone Input] -->|44.1kHz Float32 PCM| B(sounddevice InputStream Callback)
     B -->|Normal Flow| C{AI Voice Morphing Active?}
-    B -->|Hold-to-Scramble Pressed| D[Phase-Inverted Carrier Wave Injection]
+    B -->|Hold-to-Scramble Pressed| D[Synthetic Scramble Carrier Wave Injection]
     
     C -->|Yes| E["Accumulate 10,240 Samples (~230ms)"]
     C -->|No| F[Bypass to DSP Effects Matrix]

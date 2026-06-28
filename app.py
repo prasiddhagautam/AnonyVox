@@ -1,5 +1,26 @@
 import os
 import sys
+
+# --- PyTorch & TensorFlow Memory Optimizations ---
+# Maximize PyTorch memory allocation efficiency
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
+# 1. Prevent TensorFlow (sub-dependency) from pre-allocating GPU memory/RAM
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+try:
+    import tensorflow as tf
+    tf.config.set_visible_devices([], 'GPU')
+except Exception:
+    pass
+
+# 2. Limit PyTorch CPU threads to save RAM overhead
+try:
+    import torch
+    torch.set_num_threads(2)
+    torch.set_num_interop_threads(2)
+except Exception:
+    pass
+
 import wave
 import queue
 import time
@@ -429,6 +450,10 @@ class AnonyVoxApp:
         self.canvas = tk.Canvas(viz_frame, bg="#06070d", bd=0, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
+        # Create persistent waveform lines for the visualizer to prevent Tkinter memory leaks
+        self.glow_line_id = self.canvas.create_line(0, 0, 1, 1, fill="#ff007f", width=4, smooth=True)
+        self.core_line_id = self.canvas.create_line(0, 0, 1, 1, fill="#00f0ff", width=2, smooth=True)
+
         # Module F: Hardware/System Status Logs
         log_frame = tk.LabelFrame(
             right_panel, 
@@ -470,6 +495,13 @@ class AnonyVoxApp:
     def update_log(self, text):
         timestamp = time.strftime("[%H:%M:%S] ")
         self.log_text.insert(tk.END, f"{timestamp}{text}\n")
+        # Limit log display to last 200 lines to prevent memory bloat
+        try:
+            num_lines = float(self.log_text.index('end-1c').split('.')[0])
+            if num_lines > 200:
+                self.log_text.delete('1.0', '2.0')
+        except Exception:
+            pass
         self.log_text.see(tk.END)
 
     def scan_models(self):
@@ -549,6 +581,19 @@ class AnonyVoxApp:
             try:
                 with self.rvc_lock:
                     if self.rvc:
+                        # Unload previous model to free PyTorch GPU/CPU memory
+                        try:
+                            self.rvc.unload_model()
+                        except Exception:
+                            pass
+                            
+                        # Force garbage collection and clean PyTorch CUDA cache
+                        import gc
+                        import torch
+                        gc.collect()
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
+                            
                         self.rvc.load_model(model_path, index_path=index_path or "")
                         self.current_model_path = model_path
                         self.current_index_path = index_path
@@ -871,6 +916,26 @@ class AnonyVoxApp:
                 except Exception:
                     pass
 
+        # Clear queues and buffers to release memory
+        while not self.input_queue.empty():
+            try:
+                self.input_queue.get_nowait()
+            except Exception:
+                pass
+        while not self.output_queue.empty():
+            try:
+                self.output_queue.get_nowait()
+            except Exception:
+                pass
+        self.accumulator = []
+
+        # Empty PyTorch CUDA Cache to free memory when idle
+        import gc
+        import torch
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         self.start_btn.config(text="START ENGINE", bg="#00f0ff", fg="#0b0a12")
         self.start_btn.bind("<Enter>", lambda e: self.start_btn.config(bg="#80f8ff"))
         self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#00f0ff"))
@@ -880,8 +945,9 @@ class AnonyVoxApp:
 
     def input_callback(self, indata, frames, time_info, status):
         """Native sounddevice input thread callback."""
-        if status:
-            print(f"Input stream warning: {status}")
+        # Silence console print to prevent blocking the high-priority audio callback
+        # if status:
+        #     print(f"Input stream warning: {status}")
 
         input_mono = indata[:, 0].copy()
         
@@ -903,6 +969,12 @@ class AnonyVoxApp:
         if self.engine_active:
             rvc_enabled = self.rvc_enabled_var.get()
             if rvc_enabled and self.rvc is not None and self.current_model_path:
+                # Cap the queue at 15 items to prevent infinite memory growth if GPU lags behind real-time
+                if self.input_queue.qsize() > 15:
+                    try:
+                        self.input_queue.get_nowait()
+                    except queue.Empty:
+                        pass
                 self.input_queue.put(input_mono)
             else:
                 # Direct DSP processing path (low latency bypass)
@@ -911,8 +983,9 @@ class AnonyVoxApp:
 
     def output_callback(self, outdata, frames, time_info, status):
         """Native sounddevice output thread callback."""
-        if status:
-            print(f"Output stream warning: {status}")
+        # Silence console print to prevent blocking the high-priority audio callback
+        # if status:
+        #     print(f"Output stream warning: {status}")
             
         try:
             # Retrieve processed audio from queue
@@ -985,6 +1058,10 @@ class AnonyVoxApp:
                             self.temp_in_path,
                             self.temp_out_path
                         )
+                        # Clear CUDA cache immediately after inference to prevent memory bloat
+                        import torch
+                        if torch.cuda.is_available():
+                            torch.cuda.empty_cache()
 
                     # Read generated output wav from RVC
                     with wave.open(self.temp_out_path, 'rb') as w_out:
@@ -1134,8 +1211,6 @@ class AnonyVoxApp:
 
     def draw_visualizer(self):
         """Refreshes neon cyan audio waveform visualizer."""
-        self.canvas.delete("wave")
-        
         with self.visualizer_lock:
             data = self.visualizer_data.copy()
             
@@ -1160,28 +1235,16 @@ class AnonyVoxApp:
                     y = center_y - (val * center_y * 0.85)
                     points.append((x, y))
                     
-        # Render dynamic waveform with bezier smooth curve lines and neon dual-glow
+        # Update coordinates of the existing line objects to prevent Tkinter memory leaks
         if len(points) > 1:
             flat_points = [coordinate for pt in points for coordinate in pt]
-            # Background glowing pink line
-            self.canvas.create_line(
-                flat_points, 
-                fill="#ff007f", 
-                width=4, 
-                tags="wave", 
-                smooth=True
-            )
-            # Foreground sharp cyan line
-            self.canvas.create_line(
-                flat_points, 
-                fill="#00f0ff", 
-                width=2, 
-                tags="wave", 
-                smooth=True
-            )
+            if hasattr(self, 'glow_line_id') and hasattr(self, 'core_line_id'):
+                self.canvas.coords(self.glow_line_id, *flat_points)
+                self.canvas.coords(self.core_line_id, *flat_points)
         else:
-            self.canvas.create_line(0, center_y, width, center_y, fill="#ff007f", width=2, tags="wave")
-            self.canvas.create_line(0, center_y, width, center_y, fill="#00f0ff", width=1, tags="wave")
+            if hasattr(self, 'glow_line_id') and hasattr(self, 'core_line_id'):
+                self.canvas.coords(self.glow_line_id, 0, center_y, width, center_y)
+                self.canvas.coords(self.core_line_id, 0, center_y, width, center_y)
             
         # 30 ms refresh rate (~33 FPS)
         self.root.after(30, self.draw_visualizer)
