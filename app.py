@@ -23,7 +23,7 @@ class AnonyVoxApp:
         self.root.title("AnonyVox — AI Voice Morphing & Cryptographic Redaction Engine")
         self.root.geometry("980x700")
         self.root.minsize(900, 650)
-        self.root.configure(bg="#0f172a")  # Dark Slate Slate-900
+        self.root.configure(bg="#0b0a12")  # Cyberpunk Dark Violet-Black
 
         # Create lock for RVC inference thread-safety
         self.rvc_lock = threading.Lock()
@@ -110,22 +110,22 @@ class AnonyVoxApp:
                 print(f"RVC Engine initialization failed entirely: {ex}")
 
     def setup_ui_styles(self):
-        # Configure Custom Combobox Style matching Dark Slate theme
+        # Configure Custom Combobox Style matching Dark Synthwave theme
         self.style = ttk.Style()
         self.style.theme_use('default')
         self.style.configure(
             "TCombobox",
-            fieldbackground="#1e293b",
-            background="#0f172a",
+            fieldbackground="#1c1a2e",
+            background="#0b0a12",
             foreground="#ffffff",
-            bordercolor="#06b6d4",
-            lightcolor="#06b6d4",
-            darkcolor="#0f172a",
-            arrowcolor="#06b6d4"
+            bordercolor="#00f0ff",
+            lightcolor="#00f0ff",
+            darkcolor="#0b0a12",
+            arrowcolor="#00f0ff"
         )
         self.style.map(
             "TCombobox",
-            fieldbackground=[('readonly', '#1e293b'), ('disabled', '#0f172a')],
+            fieldbackground=[('readonly', '#1c1a2e'), ('disabled', '#0b0a12')],
             foreground=[('readonly', '#ffffff'), ('disabled', '#64748b')]
         )
 
@@ -138,7 +138,7 @@ class AnonyVoxApp:
         # ----------------------------------------------------
         # 1. Header Frame
         # ----------------------------------------------------
-        header_frame = tk.Frame(self.root, bg="#0f172a", height=80)
+        header_frame = tk.Frame(self.root, bg="#0b0a12", height=80)
         header_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=10)
         header_frame.grid_propagate(False)
 
@@ -146,8 +146,8 @@ class AnonyVoxApp:
             header_frame,
             text="ANONYVOX",
             font=("Segoe UI", 24, "bold"),
-            fg="#06b6d4",  # Neon Cyan
-            bg="#0f172a"
+            fg="#ff007f",  # Neon Pink
+            bg="#0b0a12"
         )
         title_label.pack(anchor="w")
 
@@ -155,15 +155,15 @@ class AnonyVoxApp:
             header_frame,
             text="AI-POWERED REAL-TIME VOICE MORPHING & CRYPTOGRAPHIC BLUR ENGINE",
             font=("Segoe UI", 9, "bold"),
-            fg="#94a3b8",  # Slate-400
-            bg="#0f172a"
+            fg="#00f0ff",  # Neon Cyan
+            bg="#0b0a12"
         )
         subtitle_label.pack(anchor="w")
 
         # ----------------------------------------------------
         # 2. Left Column Control Panel
         # ----------------------------------------------------
-        left_panel = tk.Frame(self.root, bg="#0f172a")
+        left_panel = tk.Frame(self.root, bg="#0b0a12")
         left_panel.grid(row=1, column=0, sticky="nsew", padx=20, pady=10)
         left_panel.columnconfigure(0, weight=1)
 
@@ -172,18 +172,18 @@ class AnonyVoxApp:
             left_panel, 
             text=" CORE HARDWARE ROUTING ", 
             font=("Segoe UI", 10, "bold"),
-            fg="#06b6d4", bg="#0f172a", 
-            bd=1, relief="solid", highlightbackground="#06b6d4"
+            fg="#00f0ff", bg="#13121f", 
+            bd=1, relief="solid", highlightbackground="#00f0ff"
         )
         hw_frame.pack(fill="x", pady=10, ipady=5)
         hw_frame.columnconfigure(1, weight=1)
 
-        tk.Label(hw_frame, text="Input Microphone:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        tk.Label(hw_frame, text="Input Microphone:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=0, column=0, sticky="w", padx=10, pady=5)
         self.input_dropdown = ttk.Combobox(hw_frame, textvariable=self.input_device_var, state="readonly")
         self.input_dropdown.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
         self.input_dropdown.bind("<<ComboboxSelected>>", self.on_device_changed)
 
-        tk.Label(hw_frame, text="Output Speaker/VAC:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        tk.Label(hw_frame, text="Output Speaker/VAC:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=1, column=0, sticky="w", padx=10, pady=5)
         self.output_dropdown = ttk.Combobox(hw_frame, textvariable=self.output_device_var, state="readonly")
         self.output_dropdown.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
         self.output_dropdown.bind("<<ComboboxSelected>>", self.on_device_changed)
@@ -195,29 +195,29 @@ class AnonyVoxApp:
             variable=self.monitor_audio_var,
             onvalue=True, offvalue=False,
             font=("Segoe UI", 9, "bold"),
-            fg="#06b6d4", bg="#0f172a", selectcolor="#0f172a",
-            activebackground="#0f172a", activeforeground="#06b6d4"
+            fg="#00f0ff", bg="#13121f", selectcolor="#13121f",
+            activebackground="#13121f", activeforeground="#00f0ff"
         )
         self.monitor_chk.grid(row=2, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
         # Refresh Hardware Selector Button
         refresh_btn = tk.Button(
             hw_frame, text="REFRESH HARDWARE",
-            bg="#1e293b", fg="#06b6d4", activebackground="#334155", activeforeground="#ffffff",
-            font=("Segoe UI", 8, "bold"), bd=1, relief="solid", highlightbackground="#06b6d4",
+            bg="#1c1a2e", fg="#00f0ff", activebackground="#2d2a4a", activeforeground="#ffffff",
+            font=("Segoe UI", 8, "bold"), bd=1, relief="solid", highlightbackground="#00f0ff",
             command=self.populate_devices, padx=10, pady=4
         )
         refresh_btn.grid(row=3, column=0, columnspan=2, pady=10, padx=10, sticky="ew")
-        refresh_btn.bind("<Enter>", lambda e: refresh_btn.config(bg="#334155"))
-        refresh_btn.bind("<Leave>", lambda e: refresh_btn.config(bg="#1e293b"))
+        refresh_btn.bind("<Enter>", lambda e: refresh_btn.config(bg="#2d2a4a"))
+        refresh_btn.bind("<Leave>", lambda e: refresh_btn.config(bg="#1c1a2e"))
 
         # Module B: RVC AI Engine Setup
         rvc_frame = tk.LabelFrame(
             left_panel, 
             text=" AI RVC MODULATOR ", 
             font=("Segoe UI", 10, "bold"),
-            fg="#06b6d4", bg="#0f172a", 
-            bd=1, relief="solid"
+            fg="#ff007f", bg="#13121f", 
+            bd=1, relief="solid", highlightbackground="#ff007f"
         )
         rvc_frame.pack(fill="x", pady=10, ipady=5)
         rvc_frame.columnconfigure(1, weight=1)
@@ -229,32 +229,32 @@ class AnonyVoxApp:
             variable=self.rvc_enabled_var,
             onvalue=True, offvalue=False,
             font=("Segoe UI", 9, "bold"),
-            fg="#06b6d4", bg="#0f172a", selectcolor="#0f172a",
-            activebackground="#0f172a", activeforeground="#06b6d4",
+            fg="#ff007f", bg="#13121f", selectcolor="#13121f",
+            activebackground="#13121f", activeforeground="#ff007f",
             command=self.on_rvc_toggle
         )
         self.rvc_chk.grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
-        tk.Label(rvc_frame, text="Select RVC Model:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        tk.Label(rvc_frame, text="Select RVC Model:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=1, column=0, sticky="w", padx=10, pady=5)
         self.model_dropdown = ttk.Combobox(rvc_frame, textvariable=self.model_var, state="readonly")
         self.model_dropdown.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
         self.model_dropdown.bind("<<ComboboxSelected>>", self.on_model_selected)
 
         # Pitch scale slider component (-12 to +12 semitones)
-        tk.Label(rvc_frame, text="Pitch Transposition:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=2, column=0, sticky="w", padx=10, pady=5)
-        self.pitch_slider_frame = tk.Frame(rvc_frame, bg="#0f172a")
+        tk.Label(rvc_frame, text="Pitch Transposition:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        self.pitch_slider_frame = tk.Frame(rvc_frame, bg="#13121f")
         self.pitch_slider_frame.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
         self.pitch_slider_frame.columnconfigure(0, weight=1)
 
         self.pitch_slider = tk.Scale(
             self.pitch_slider_frame, from_=-12, to=12, orient="horizontal",
             variable=self.pitch_val, showvalue=False,
-            bg="#0f172a", fg="#ffffff", troughcolor="#1e293b",
-            activebackground="#06b6d4", highlightthickness=0, bd=0
+            bg="#13121f", fg="#ffffff", troughcolor="#1c1a2e",
+            activebackground="#ff007f", highlightthickness=0, bd=0
         )
         self.pitch_slider.grid(row=0, column=0, sticky="ew")
         
-        self.pitch_lbl = tk.Label(self.pitch_slider_frame, text="0 st", font=("Segoe UI", 9, "bold"), fg="#06b6d4", bg="#0f172a", width=6)
+        self.pitch_lbl = tk.Label(self.pitch_slider_frame, text="0 st", font=("Segoe UI", 9, "bold"), fg="#ff007f", bg="#13121f", width=6)
         self.pitch_lbl.grid(row=0, column=1, padx=5)
         self.pitch_val.trace_add("write", lambda *args: self.pitch_lbl.config(text=f"{self.pitch_val.get():+d} st"))
 
@@ -263,91 +263,91 @@ class AnonyVoxApp:
             left_panel, 
             text=" DSP EFFECTS MATRIX ", 
             font=("Segoe UI", 10, "bold"),
-            fg="#06b6d4", bg="#0f172a", 
-            bd=1, relief="solid"
+            fg="#00f0ff", bg="#13121f", 
+            bd=1, relief="solid", highlightbackground="#00f0ff"
         )
         si_frame.pack(fill="x", pady=10, ipady=5)
         si_frame.columnconfigure(1, weight=1)
 
         # Effect 1: Spectral Inversion
-        tk.Label(si_frame, text="Spectral Inversion:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=0, column=0, sticky="w", padx=10, pady=5)
-        self.si_slider_frame = tk.Frame(si_frame, bg="#0f172a")
+        tk.Label(si_frame, text="Spectral Inversion:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        self.si_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.si_slider_frame.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
         self.si_slider_frame.columnconfigure(0, weight=1)
         self.si_slider = tk.Scale(
             self.si_slider_frame, from_=0.0, to=1.0, resolution=0.01, orient="horizontal",
             variable=self.spectral_inversion_val, showvalue=False,
-            bg="#0f172a", fg="#ffffff", troughcolor="#1e293b",
-            activebackground="#06b6d4", highlightthickness=0, bd=0
+            bg="#13121f", fg="#ffffff", troughcolor="#1c1a2e",
+            activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.si_slider.grid(row=0, column=0, sticky="ew")
-        self.si_lbl = tk.Label(self.si_slider_frame, text="0.00", font=("Segoe UI", 9, "bold"), fg="#06b6d4", bg="#0f172a", width=6)
+        self.si_lbl = tk.Label(self.si_slider_frame, text="0.00", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
         self.si_lbl.grid(row=0, column=1, padx=5)
         self.spectral_inversion_val.trace_add("write", lambda *args: self.si_lbl.config(text=f"{self.spectral_inversion_val.get():.2f}"))
 
         # Effect 2: Ring Modulation
-        tk.Label(si_frame, text="Ring Modulator:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=1, column=0, sticky="w", padx=10, pady=5)
-        self.ring_slider_frame = tk.Frame(si_frame, bg="#0f172a")
+        tk.Label(si_frame, text="Ring Modulator:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        self.ring_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.ring_slider_frame.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
         self.ring_slider_frame.columnconfigure(0, weight=1)
         self.ring_slider = tk.Scale(
             self.ring_slider_frame, from_=0, to=1200, resolution=10, orient="horizontal",
             variable=self.ring_mod_val, showvalue=False,
-            bg="#0f172a", fg="#ffffff", troughcolor="#1e293b",
-            activebackground="#06b6d4", highlightthickness=0, bd=0
+            bg="#13121f", fg="#ffffff", troughcolor="#1c1a2e",
+            activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.ring_slider.grid(row=0, column=0, sticky="ew")
-        self.ring_lbl = tk.Label(self.ring_slider_frame, text="0 Hz", font=("Segoe UI", 9, "bold"), fg="#06b6d4", bg="#0f172a", width=6)
+        self.ring_lbl = tk.Label(self.ring_slider_frame, text="0 Hz", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
         self.ring_lbl.grid(row=0, column=1, padx=5)
         self.ring_mod_val.trace_add("write", lambda *args: self.ring_lbl.config(text=f"{self.ring_mod_val.get()} Hz"))
 
         # Effect 3: Tremolo
-        tk.Label(si_frame, text="Vocal Tremolo:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=2, column=0, sticky="w", padx=10, pady=5)
-        self.trem_slider_frame = tk.Frame(si_frame, bg="#0f172a")
+        tk.Label(si_frame, text="Vocal Tremolo:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        self.trem_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.trem_slider_frame.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
         self.trem_slider_frame.columnconfigure(0, weight=1)
         self.trem_slider = tk.Scale(
             self.trem_slider_frame, from_=0.0, to=1.0, resolution=0.01, orient="horizontal",
             variable=self.tremolo_depth_val, showvalue=False,
-            bg="#0f172a", fg="#ffffff", troughcolor="#1e293b",
-            activebackground="#06b6d4", highlightthickness=0, bd=0
+            bg="#13121f", fg="#ffffff", troughcolor="#1c1a2e",
+            activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.trem_slider.grid(row=0, column=0, sticky="ew")
-        self.trem_lbl = tk.Label(self.trem_slider_frame, text="0.00", font=("Segoe UI", 9, "bold"), fg="#06b6d4", bg="#0f172a", width=6)
+        self.trem_lbl = tk.Label(self.trem_slider_frame, text="0.00", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
         self.trem_lbl.grid(row=0, column=1, padx=5)
         self.tremolo_depth_val.trace_add("write", lambda *args: self.trem_lbl.config(text=f"{self.tremolo_depth_val.get():.2f}"))
 
         # Effect 4: Vocal Distortion
-        tk.Label(si_frame, text="Overdrive Dist:", font=("Segoe UI", 9), fg="#ffffff", bg="#0f172a").grid(row=3, column=0, sticky="w", padx=10, pady=5)
-        self.dist_slider_frame = tk.Frame(si_frame, bg="#0f172a")
+        tk.Label(si_frame, text="Overdrive Dist:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        self.dist_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.dist_slider_frame.grid(row=3, column=1, sticky="ew", padx=10, pady=5)
         self.dist_slider_frame.columnconfigure(0, weight=1)
         self.dist_slider = tk.Scale(
             self.dist_slider_frame, from_=1.0, to=10.0, resolution=0.1, orient="horizontal",
             variable=self.distortion_val, showvalue=False,
-            bg="#0f172a", fg="#ffffff", troughcolor="#1e293b",
-            activebackground="#06b6d4", highlightthickness=0, bd=0
+            bg="#13121f", fg="#ffffff", troughcolor="#1c1a2e",
+            activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.dist_slider.grid(row=0, column=0, sticky="ew")
-        self.dist_lbl = tk.Label(self.dist_slider_frame, text="1.0x", font=("Segoe UI", 9, "bold"), fg="#06b6d4", bg="#0f172a", width=6)
+        self.dist_lbl = tk.Label(self.dist_slider_frame, text="1.0x", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
         self.dist_lbl.grid(row=0, column=1, padx=5)
         self.distortion_val.trace_add("write", lambda *args: self.dist_lbl.config(text=f"{self.distortion_val.get():.1f}x"))
 
         # Engine Power Switch
         self.start_btn = tk.Button(
             left_panel, text="START ENGINE",
-            bg="#06b6d4", fg="#0f172a", activebackground="#22d3ee", activeforeground="#0f172a",
+            bg="#00f0ff", fg="#0b0a12", activebackground="#80f8ff", activeforeground="#0b0a12",
             font=("Segoe UI", 12, "bold"), bd=0, cursor="hand2",
             command=self.toggle_engine, pady=10
         )
         self.start_btn.pack(fill="x", pady=15)
-        self.start_btn.bind("<Enter>", lambda e: self.start_btn.config(bg="#22d3ee") if not self.engine_active else None)
-        self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#06b6d4") if not self.engine_active else None)
+        self.start_btn.bind("<Enter>", lambda e: self.start_btn.config(bg="#80f8ff") if not self.engine_active else None)
+        self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#00f0ff") if not self.engine_active else None)
 
         # ----------------------------------------------------
         # 3. Right Column Output & Diagnostics Panel
         # ----------------------------------------------------
-        right_panel = tk.Frame(self.root, bg="#0f172a")
+        right_panel = tk.Frame(self.root, bg="#0b0a12")
         right_panel.grid(row=1, column=1, sticky="nsew", padx=20, pady=10)
         right_panel.rowconfigure(1, weight=1)
         right_panel.columnconfigure(0, weight=1)
@@ -357,15 +357,15 @@ class AnonyVoxApp:
             right_panel, 
             text=" SEMANTIC REDACTION ", 
             font=("Segoe UI", 10, "bold"),
-            fg="#06b6d4", bg="#0f172a", 
-            bd=1, relief="solid"
+            fg="#ff007f", bg="#13121f", 
+            bd=1, relief="solid", highlightbackground="#ff007f"
         )
         redact_frame.pack(fill="x", pady=10, ipady=5)
         
         self.scramble_btn = tk.Button(
             redact_frame, text="HOLD TO SCRAMBLE VOICE",
-            bg="#1e293b", fg="#ef4444", activebackground="#ef4444", activeforeground="#ffffff",
-            font=("Segoe UI", 12, "bold"), bd=1, relief="solid", highlightbackground="#ef4444",
+            bg="#1c1a2e", fg="#ff2a5f", activebackground="#ff2a5f", activeforeground="#ffffff",
+            font=("Segoe UI", 12, "bold"), bd=1, relief="solid", highlightbackground="#ff2a5f",
             cursor="hand2", pady=15
         )
         self.scramble_btn.pack(fill="x", padx=15, pady=15)
@@ -373,22 +373,22 @@ class AnonyVoxApp:
         # Mouse listener bindings for click-and-hold scrambling functionality
         self.scramble_btn.bind("<ButtonPress-1>", self.on_scramble_start)
         self.scramble_btn.bind("<ButtonRelease-1>", self.on_scramble_stop)
-        self.scramble_btn.bind("<Enter>", lambda e: self.scramble_btn.config(bg="#2d1520") if not self.scramble_active else None)
-        self.scramble_btn.bind("<Leave>", lambda e: self.scramble_btn.config(bg="#1e293b") if not self.scramble_active else None)
+        self.scramble_btn.bind("<Enter>", lambda e: self.scramble_btn.config(bg="#3a1324") if not self.scramble_active else None)
+        self.scramble_btn.bind("<Leave>", lambda e: self.scramble_btn.config(bg="#1c1a2e") if not self.scramble_active else None)
 
         # Module E: Live Visualizer Screen
         viz_frame = tk.LabelFrame(
             right_panel, 
             text=" DETECTOR WAVEFORM ", 
             font=("Segoe UI", 10, "bold"),
-            fg="#06b6d4", bg="#0f172a", 
-            bd=1, relief="solid"
+            fg="#00f0ff", bg="#13121f", 
+            bd=1, relief="solid", highlightbackground="#00f0ff"
         )
         viz_frame.pack(fill="both", expand=True, pady=10)
         viz_frame.rowconfigure(0, weight=1)
         viz_frame.columnconfigure(0, weight=1)
 
-        self.canvas = tk.Canvas(viz_frame, bg="#1e293b", bd=0, highlightthickness=0)
+        self.canvas = tk.Canvas(viz_frame, bg="#06070d", bd=0, highlightthickness=0)
         self.canvas.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
 
         # Module F: Hardware/System Status Logs
@@ -396,8 +396,8 @@ class AnonyVoxApp:
             right_panel, 
             text=" SYSTEM ENGINE LOGS ", 
             font=("Segoe UI", 10, "bold"),
-            fg="#06b6d4", bg="#0f172a", 
-            bd=1, relief="solid"
+            fg="#00f0ff", bg="#13121f", 
+            bd=1, relief="solid", highlightbackground="#00f0ff"
         )
         log_frame.pack(fill="x", pady=10)
 
@@ -405,13 +405,13 @@ class AnonyVoxApp:
             log_frame, 
             text="System Initialized. Idle.", 
             font=("Segoe UI", 9, "bold"),
-            fg="#94a3b8", bg="#0f172a", anchor="w"
+            fg="#a78bfa", bg="#13121f", anchor="w"
         )
         self.status_label.pack(fill="x", padx=10, pady=5)
 
         self.log_text = tk.Text(
             log_frame, height=5, font=("Courier New", 8),
-            bg="#020617", fg="#38bdf8", bd=0, highlightthickness=0
+            bg="#06070d", fg="#a78bfa", bd=0, highlightthickness=0
         )
         self.log_text.pack(fill="x", padx=10, pady=5)
         
@@ -613,14 +613,14 @@ class AnonyVoxApp:
 
     def on_scramble_start(self, event):
         self.scramble_active = True
-        self.scramble_btn.config(bg="#ef4444", fg="#ffffff", text="SCRAMBLER DEPLOYED (BLUR ACTIVE)")
-        self.status_label.config(text="AI Semantic Redaction Engaged • Scrambling PCM Frames", fg="#ef4444")
+        self.scramble_btn.config(bg="#ff2a5f", fg="#ffffff", text="SCRAMBLER DEPLOYED (BLUR ACTIVE)")
+        self.status_label.config(text="AI Semantic Redaction Engaged • Scrambling PCM Frames", fg="#ff2a5f")
         self.update_log("ALERT: Scramble hotkey pressed. AI inference bypassed. Encrypted privacy carrier injected.")
 
     def on_scramble_stop(self, event):
         self.scramble_active = False
-        self.scramble_btn.config(bg="#1e293b", fg="#ef4444", text="HOLD TO SCRAMBLE VOICE")
-        self.status_label.config(text="Ready • Modulator Online", fg="#06b6d4")
+        self.scramble_btn.config(bg="#1c1a2e", fg="#ff2a5f", text="HOLD TO SCRAMBLE VOICE")
+        self.status_label.config(text="Ready • Modulator Online", fg="#00f0ff")
         self.update_log("Scramble hotkey released. Duplex AI inference loop resumed.")
 
     def toggle_engine(self):
@@ -684,12 +684,12 @@ class AnonyVoxApp:
             self.output_stream.start()
             
             self.engine_active = True
-            self.start_btn.config(text="STOP ENGINE", bg="#ef4444")
-            self.start_btn.bind("<Enter>", lambda e: self.start_btn.config(bg="#f87171"))
-            self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#ef4444"))
+            self.start_btn.config(text="STOP ENGINE", bg="#ff2a5f", fg="#ffffff")
+            self.start_btn.bind("<Enter>", lambda e: self.start_btn.config(bg="#ff5c85"))
+            self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#ff2a5f"))
             
             self.update_log("Duplex Input/Output streams ENGAGED.")
-            self.status_label.config(text="Audio Modulator Active • Dual-Stream Routing Engaged", fg="#06b6d4")
+            self.status_label.config(text="Audio Modulator Active • Dual-Stream Routing Engaged", fg="#00f0ff")
         except Exception as e:
             self.update_log(f"Stream startup failure: {e}")
             messagebox.showerror("Engine Failure", f"Sounddevice failed to bind stream configuration:\n{e}")
@@ -725,9 +725,9 @@ class AnonyVoxApp:
                 except Exception:
                     pass
 
-        self.start_btn.config(text="START ENGINE", bg="#06b6d4")
-        self.start_btn.bind("<Enter>", lambda e: self.start_btn.config(bg="#22d3ee"))
-        self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#06b6d4"))
+        self.start_btn.config(text="START ENGINE", bg="#00f0ff", fg="#0b0a12")
+        self.start_btn.bind("<Enter>", lambda e: self.start_btn.config(bg="#80f8ff"))
+        self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#00f0ff"))
         
         self.update_log("Duplex Audio stream DISENGAGED.")
         self.status_label.config(text="System Stopped. Idle.", fg="#94a3b8")
@@ -1010,18 +1010,28 @@ class AnonyVoxApp:
                     y = center_y - (val * center_y * 0.85)
                     points.append((x, y))
                     
-        # Render dynamic waveform with bezier smooth curve lines
+        # Render dynamic waveform with bezier smooth curve lines and neon dual-glow
         if len(points) > 1:
             flat_points = [coordinate for pt in points for coordinate in pt]
+            # Background glowing pink line
             self.canvas.create_line(
                 flat_points, 
-                fill="#06b6d4",  # Neon Cyan
+                fill="#ff007f", 
+                width=4, 
+                tags="wave", 
+                smooth=True
+            )
+            # Foreground sharp cyan line
+            self.canvas.create_line(
+                flat_points, 
+                fill="#00f0ff", 
                 width=2, 
                 tags="wave", 
                 smooth=True
             )
         else:
-            self.canvas.create_line(0, center_y, width, center_y, fill="#06b6d4", width=1, tags="wave")
+            self.canvas.create_line(0, center_y, width, center_y, fill="#ff007f", width=2, tags="wave")
+            self.canvas.create_line(0, center_y, width, center_y, fill="#00f0ff", width=1, tags="wave")
             
         # 30 ms refresh rate (~33 FPS)
         self.root.after(30, self.draw_visualizer)
