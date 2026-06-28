@@ -40,12 +40,12 @@ graph TD
     B -->|Normal Flow| C{AI Voice Morphing Active?}
     B -->|Hold-to-Scramble Pressed| D[Phase-Inverted Carrier Wave Injection]
     
-    C -->|Yes| E[Accumulate 10,240 Samples (~230ms)]
+    C -->|Yes| E["Accumulate 10,240 Samples (~230ms)"]
     C -->|No| F[Bypass to DSP Effects Matrix]
     
-    E -->|Write WAV| G[Temp File: temp_voice_in.wav]
-    G -->|RVC Inference: CUDA GPU| H[RVC Model execution: RMVPE & Hubert]
-    H -->|Write WAV| I[Temp File: temp_voice_out.wav]
+    E -->|Write WAV| G["Temp File: temp_voice_in.wav"]
+    G -->|RVC Inference: CUDA GPU| H["RVC Model execution: RMVPE & Hubert"]
+    H -->|Write WAV| I["Temp File: temp_voice_out.wav"]
     I -->|Interpolate & Resample| F
     
     F -->|Ring Mod / Tremolo / Overdrive / Inversion| J[Final Audio Block Queue]
@@ -66,8 +66,7 @@ AnonyVox/
 ├── models/                  # Put your RVC weights (.pth) and indices (.index) here
 ├── app.py                   # Main GUI Application logic and thread managers
 ├── install_dependencies.py  # Automation script installing conflicting wheels (fairseq, faiss)
-├── requirements.txt         # Consolidated python dependency list
-└── LICENSE                  # MIT License
+└── requirements.txt         # Consolidated python dependency list
 ```
 
 ---
