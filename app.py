@@ -258,6 +258,13 @@ class AnonyVoxApp:
         self.pitch_lbl.grid(row=0, column=1, padx=5)
         self.pitch_val.trace_add("write", lambda *args: self.pitch_lbl.config(text=f"{self.pitch_val.get():+d} st"))
 
+        # Voice Profile Presets Dropdown
+        tk.Label(rvc_frame, text="Vocal Preset:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        self.preset_var = tk.StringVar(value="Select Preset...")
+        self.preset_dropdown = ttk.Combobox(rvc_frame, textvariable=self.preset_var, values=["Select Preset...", "Deep Male", "High Female", "Astral Echo", "Overdrive Cyborg", "Default Reset"], state="readonly")
+        self.preset_dropdown.grid(row=3, column=1, sticky="ew", padx=10, pady=5)
+        self.preset_dropdown.bind("<<ComboboxSelected>>", self.on_preset_selected)
+
         # Module C: DSP Voice Modifiers Frame
         si_frame = tk.LabelFrame(
             left_panel, 
@@ -375,6 +382,37 @@ class AnonyVoxApp:
         self.scramble_btn.bind("<ButtonRelease-1>", self.on_scramble_stop)
         self.scramble_btn.bind("<Enter>", lambda e: self.scramble_btn.config(bg="#3a1324") if not self.scramble_active else None)
         self.scramble_btn.bind("<Leave>", lambda e: self.scramble_btn.config(bg="#1c1a2e") if not self.scramble_active else None)
+
+        # Module G: Utilities and Virtual Audio Cable Router
+        util_frame = tk.LabelFrame(
+            right_panel, 
+            text=" UTILITIES & ROUTING ", 
+            font=("Segoe UI", 10, "bold"),
+            fg="#00f0ff", bg="#13121f", 
+            bd=1, relief="solid", highlightbackground="#00f0ff"
+        )
+        util_frame.pack(fill="x", pady=10, ipady=5)
+        util_frame.columnconfigure(0, weight=1)
+        util_frame.columnconfigure(1, weight=1)
+        
+        self.is_recording = False
+        self.recorded_blocks = []
+        
+        self.record_btn = tk.Button(
+            util_frame, text="🔴 START RECORDING",
+            bg="#1c1a2e", fg="#ff2a5f", activebackground="#ff2a5f", activeforeground="#ffffff",
+            font=("Segoe UI", 9, "bold"), bd=1, relief="solid", highlightbackground="#ff2a5f",
+            cursor="hand2", command=self.toggle_recording, pady=6
+        )
+        self.record_btn.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        
+        self.route_btn = tk.Button(
+            util_frame, text="🔌 AUTO-ROUTE VIRTUAL MIC",
+            bg="#1c1a2e", fg="#00f0ff", activebackground="#00f0ff", activeforeground="#0b0a12",
+            font=("Segoe UI", 9, "bold"), bd=1, relief="solid", highlightbackground="#00f0ff",
+            cursor="hand2", command=self.auto_route_virtual_mic, pady=6
+        )
+        self.route_btn.grid(row=0, column=1, padx=10, pady=10, sticky="ew")
 
         # Module E: Live Visualizer Screen
         viz_frame = tk.LabelFrame(
@@ -551,6 +589,114 @@ class AnonyVoxApp:
                 self.update_log("AI voice conversion pipeline ENGAGED.")
         else:
             self.update_log("AI voice conversion pipeline DISENGAGED. Standard DSP active.")
+
+    def on_preset_selected(self, event=None):
+        preset = self.preset_var.get()
+        if preset == "Select Preset...":
+            return
+            
+        self.update_log(f"Applying Preset Profile: {preset}")
+        
+        if preset == "Deep Male":
+            self.pitch_val.set(-5)
+            self.spectral_inversion_val.set(0.0)
+            self.ring_mod_val.set(0)
+            self.tremolo_depth_val.set(0.0)
+            self.distortion_val.set(1.0)
+        elif preset == "High Female":
+            self.pitch_val.set(5)
+            self.spectral_inversion_val.set(0.0)
+            self.ring_mod_val.set(0)
+            self.tremolo_depth_val.set(0.0)
+            self.distortion_val.set(1.0)
+        elif preset == "Astral Echo":
+            self.pitch_val.set(0)
+            self.spectral_inversion_val.set(0.40)
+            self.ring_mod_val.set(150)
+            self.tremolo_depth_val.set(0.20)
+            self.distortion_val.set(1.0)
+        elif preset == "Overdrive Cyborg":
+            self.pitch_val.set(-3)
+            self.spectral_inversion_val.set(0.0)
+            self.ring_mod_val.set(400)
+            self.tremolo_depth_val.set(0.0)
+            self.distortion_val.set(4.0)
+        elif preset == "Default Reset":
+            self.pitch_val.set(0)
+            self.spectral_inversion_val.set(0.0)
+            self.ring_mod_val.set(0)
+            self.tremolo_depth_val.set(0.0)
+            self.distortion_val.set(1.0)
+            
+        self.status_label.config(text=f"Preset Loaded: {preset}", fg="#a78bfa")
+
+    def auto_route_virtual_mic(self):
+        found = False
+        for friendly_name, idx in self.device_name_to_index.items():
+            if "cable" in friendly_name.lower() or "virtual" in friendly_name.lower() or "vac" in friendly_name.lower():
+                if friendly_name in self.output_dropdown['values']:
+                    self.output_device_var.set(friendly_name)
+                    found = True
+                    self.update_log(f"Auto-routed output to Virtual Audio Cable: {friendly_name}")
+                    self.on_device_changed()
+                    
+                    messagebox.showinfo(
+                        "Virtual Mic Auto-Route Active",
+                        f"Routed morphed audio output to: \n'{friendly_name}'\n\n"
+                        "To make the OS and communication apps (Discord, Zoom, etc.) receive the morphed voice:\n"
+                        "1. Open your Sound Control Panel or app Voice Settings.\n"
+                        "2. Set the INPUT device (Microphone) to 'CABLE Output (VB-Audio Virtual Cable)'.\n"
+                        "3. Your morphed voice is now routed directly as your virtual microphone!"
+                    )
+                    break
+        if not found:
+            self.update_log("Virtual Mic Auto-Route failed: No VB-Audio Cable detected.")
+            messagebox.showwarning(
+                "Virtual Cable Helper",
+                "No Virtual Audio Cable was detected on your system.\n\n"
+                "To route your morphed voice to Discord or games, you need to install a virtual audio driver.\n\n"
+                "Recommended: Download free 'VB-CABLE Driver' from vb-audio.com, install it, and refresh hardware!"
+            )
+
+    def toggle_recording(self):
+        if not self.engine_active:
+            messagebox.showwarning("Recorder Error", "Please start the audio engine first.")
+            return
+            
+        if not self.is_recording:
+            self.is_recording = True
+            self.recorded_blocks = []
+            self.record_btn.config(text="⏹️ STOP RECORDING", bg="#ff2a5f", fg="#ffffff")
+            self.update_log("Recording started... Morphing output is being captured.")
+            self.status_label.config(text="Recording Active • Capturing Audio Output", fg="#ff2a5f")
+        else:
+            self.is_recording = False
+            self.record_btn.config(text="🔴 START RECORDING", bg="#1c1a2e", fg="#ff2a5f")
+            self.update_log("Recording stopped. Saving file...")
+            
+            if self.recorded_blocks:
+                threading.Thread(target=self.save_recorded_file, daemon=True).start()
+            else:
+                self.update_log("Recording discarded: No audio captured.")
+
+    def save_recorded_file(self):
+        try:
+            all_audio = np.concatenate(self.recorded_blocks)
+            filename = f"anonyvox_recording_{int(time.time())}.wav"
+            filepath = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+            
+            pcm_data = (all_audio * 32767.0).astype(np.int16)
+            with wave.open(filepath, 'wb') as w:
+                w.setnchannels(1)
+                w.setsampwidth(2)
+                w.setframerate(44100)
+                w.writeframes(pcm_data.tobytes())
+                
+            self.root.after(0, lambda: self.update_log(f"SUCCESS: Recording saved to {filename}"))
+            self.root.after(0, lambda: self.status_label.config(text=f"Recording Saved: {filename}", fg="#00f0ff"))
+        except Exception as e:
+            self.root.after(0, lambda: self.update_log(f"Recording save failed: {e}"))
+            self.root.after(0, lambda: messagebox.showerror("Recorder Error", f"Failed to save recording:\n{e}"))
 
     def populate_devices(self):
         try:
@@ -777,6 +923,10 @@ class AnonyVoxApp:
             else:
                 outdata.fill(0) # Output silence to speaker but keep stream active
                 
+            # Record output blocks if active
+            if hasattr(self, 'is_recording') and self.is_recording:
+                self.recorded_blocks.append(processed_mono.copy())
+
             # Update visualizer with output audio
             with self.visualizer_lock:
                 self.visualizer_data = processed_mono.copy()
