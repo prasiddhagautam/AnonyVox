@@ -1,0 +1,14 @@
+sounddevice>=0.4.6
+numpy>=1.24.0
+faiss-cpu
+ffmpeg-python
+loguru
+av
+soundfile
+praat-parselmouth
+torchcrepe
+pyworld
+einops
+torch
+torchaudio
+rvc-python

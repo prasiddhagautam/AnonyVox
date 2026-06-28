@@ -1,0 +1,20 @@
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Temporary Audio Files
+*.wav
+
+# Ignore voice model weights (large binary files)
+models/*
+!models/.gitkeep
+!models/README.md
