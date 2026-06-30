@@ -1,26 +1,5 @@
 import os
 import sys
-
-# --- PyTorch & TensorFlow Memory Optimizations ---
-# Maximize PyTorch memory allocation efficiency
-os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
-# 1. Prevent TensorFlow (sub-dependency) from pre-allocating GPU memory/RAM
-os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-try:
-    import tensorflow as tf
-    tf.config.set_visible_devices([], 'GPU')
-except Exception:
-    pass
-
-# 2. Limit PyTorch CPU threads to save RAM overhead
-try:
-    import torch
-    torch.set_num_threads(2)
-    torch.set_num_interop_threads(2)
-except Exception:
-    pass
-
 import wave
 import queue
 import time
@@ -30,12 +9,17 @@ import sounddevice as sd
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-# Fallback mechanism for RVC Inference dependency
-try:
-    from rvc_python.infer import RVCInference
-    RVC_AVAILABLE = True
-except BaseException:
-    RVC_AVAILABLE = False
+# --- PyTorch & TensorFlow Memory Optimizations ---
+# Maximize PyTorch memory allocation efficiency
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:32'
+# 1. Prevent TensorFlow (sub-dependency) from pre-allocating GPU memory/RAM
+os.environ['TF_FORCE_GPU_ALLOW_GROWTH'] = 'true'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+# Global flags for asynchronously loaded dependencies
+RVC_AVAILABLE = False
+RVCInference = None
+
 
 
 class AnonyVoxApp:
@@ -79,10 +63,9 @@ class AnonyVoxApp:
         self.visualizer_data = np.zeros(512, dtype=np.float32)
         self.visualizer_lock = threading.Lock()
 
-        # Initialize core RVC inference engine
+        # Initialize core RVC inference engine variables (loaded asynchronously in background)
         self.rvc = None
         self.cuda_active = False
-        self.initialize_rvc_engine()
         
         # Set up Tkinter variables
         self.pitch_val = tk.IntVar(value=0)
@@ -107,33 +90,88 @@ class AnonyVoxApp:
         # Start Waveform animation loop
         self.draw_visualizer()
 
-    def initialize_rvc_engine(self):
-        if not RVC_AVAILABLE:
-            print("Warning: rvc-python library is not installed.")
-            return
+        # Start background dependency loading thread now that UI elements are built
+        threading.Thread(target=self.async_initialize_dependencies, daemon=True).start()
 
-        # Attempt GPU CUDA Initialization
+    def async_initialize_dependencies(self):
+        global RVC_AVAILABLE, RVCInference
+        
+        # 1. Optimize TensorFlow (sub-dependency) memory
         try:
-            # Explicit CUDA:0 execution context
-            self.rvc = RVCInference(device="cuda:0")
-            self.cuda_active = True
-            print("Successfully initialized RVCInference on CUDA:0 GPU.")
+            import tensorflow as tf
+            tf.config.set_visible_devices([], 'GPU')
+            self.root.after(0, lambda: self.update_log("TensorFlow configured to bypass GPU memory pre-allocation."))
         except Exception as e:
-            print(f"CUDA initialization failed: {e}. Attempting CPU fallback...")
+            self.root.after(0, lambda: self.update_log(f"TensorFlow config bypassed: {e}"))
+            
+        # 2. Optimize PyTorch thread settings
+        try:
+            import torch
+            torch.set_num_threads(2)
+            torch.set_num_interop_threads(2)
+            self.root.after(0, lambda: self.update_log("PyTorch execution environment loaded & thread-limited."))
+        except Exception as e:
+            self.root.after(0, lambda: self.update_log(f"PyTorch initialization bypassed: {e}"))
+
+        # 3. Import RVCInference from rvc_python
+        try:
+            from rvc_python.infer import RVCInference as RVCInf
+            RVCInference = RVCInf
+            RVC_AVAILABLE = True
+            self.root.after(0, lambda: self.update_log("AI voice morphing libraries imported successfully."))
+        except BaseException as e:
+            RVC_AVAILABLE = False
+            self.root.after(0, lambda: self.update_log(f"Failed to import RVC libraries: {e}"))
+
+        # 4. Initialize RVC Engine Instance
+        if RVC_AVAILABLE and RVCInference is not None:
             try:
-                # CPU Fallback
-                self.rvc = RVCInference(device="cpu")
-                self.cuda_active = False
-                print("Successfully initialized RVCInference on CPU.")
-            except Exception as ex:
-                self.rvc = None
-                self.cuda_active = False
-                print(f"RVC Engine initialization failed entirely: {ex}")
+                # Attempt GPU CUDA Initialization
+                self.rvc = RVCInference(device="cuda:0")
+                self.cuda_active = True
+                self.root.after(0, lambda: self.update_log("Successfully initialized RVC Modulator on CUDA:0 GPU."))
+            except Exception as e:
+                self.root.after(0, lambda: self.update_log(f"CUDA initialization failed: {e}. Attempting CPU fallback..."))
+                try:
+                    # CPU Fallback
+                    self.rvc = RVCInference(device="cpu")
+                    self.cuda_active = False
+                    self.root.after(0, lambda: self.update_log("Successfully initialized RVC Modulator on CPU."))
+                except Exception as ex:
+                    self.rvc = None
+                    self.cuda_active = False
+                    self.root.after(0, lambda: self.update_log(f"RVC Engine initialization failed entirely: {ex}"))
+        else:
+            self.rvc = None
+            self.cuda_active = False
+
+        # Post-initialization callback on GUI thread
+        self.root.after(0, self.on_dependencies_initialized)
+
+    def on_dependencies_initialized(self):
+        # Update RVC checkbox state based on new availability
+        if RVC_AVAILABLE and self.rvc is not None:
+            self.rvc_chk.config(state="normal")
+            self.rvc_enabled_var.set(True)
+            self.update_log("AI voice conversion pipeline READY.")
+        else:
+            self.rvc_chk.config(state="disabled")
+            self.rvc_enabled_var.set(False)
+            self.update_log("AI voice conversion pipeline DISABLED (fallback to DSP).")
+            
+        # Refresh model list which enables dropdown/checkbox appropriately
+        self.refresh_model_list()
+        
+        # Update status logs / info
+        self.log_diagnostic_info()
+        self.status_label.config(text="Ready • Modulator Online", foreground="#00f0ff")
 
     def setup_ui_styles(self):
         # Configure Custom Combobox Style matching Dark Synthwave theme
         self.style = ttk.Style()
-        self.style.theme_use('default')
+        self.style.theme_use('clam')
+        
+        # Configure TCombobox style
         self.style.configure(
             "TCombobox",
             fieldbackground="#1c1a2e",
@@ -149,6 +187,88 @@ class AnonyVoxApp:
             fieldbackground=[('readonly', '#1c1a2e'), ('disabled', '#0b0a12')],
             foreground=[('readonly', '#ffffff'), ('disabled', '#64748b')]
         )
+        
+        # Configure TLabel style (default for panel labels)
+        self.style.configure(
+            "TLabel",
+            background="#13121f",
+            foreground="#e2e8f0",
+            font=("Segoe UI", 9)
+        )
+        
+        # Configure Header.TLabel style
+        self.style.configure(
+            "Header.TLabel",
+            background="#0b0a12",
+            foreground="#ff007f",
+            font=("Segoe UI", 24, "bold")
+        )
+        
+        # Configure Subtitle.TLabel style
+        self.style.configure(
+            "Subtitle.TLabel",
+            background="#0b0a12",
+            foreground="#00f0ff",
+            font=("Segoe UI", 9, "bold")
+        )
+        
+        # Configure Pink.TLabel style (for pitch value display)
+        self.style.configure(
+            "Pink.TLabel",
+            background="#13121f",
+            foreground="#ff007f",
+            font=("Segoe UI", 9, "bold")
+        )
+        
+        # Configure Cyan.TLabel style (for DSP value displays)
+        self.style.configure(
+            "Cyan.TLabel",
+            background="#13121f",
+            foreground="#00f0ff",
+            font=("Segoe UI", 9, "bold")
+        )
+
+        # Configure Status.TLabel style (for status label)
+        self.style.configure(
+            "Status.TLabel",
+            background="#13121f",
+            foreground="#a78bfa",
+            font=("Segoe UI", 9, "bold")
+        )
+        
+        # Configure TCheckbutton style (Clam theme checkbox)
+        self.style.configure(
+            "TCheckbutton",
+            background="#13121f",
+            foreground="#ff007f",
+            font=("Segoe UI", 9, "bold"),
+            indicatorcolor="#1c1a2e",
+            indicatorbackground="#1c1a2e",
+            focuscolor="#13121f"
+        )
+        self.style.map(
+            "TCheckbutton",
+            background=[("active", "#13121f")],
+            foreground=[("active", "#ff5c85")],
+            indicatorbackground=[("selected", "#ff007f"), ("active", "#1c1a2e")]
+        )
+        
+        # Configure Cyan.TCheckbutton style (for monitor checkbox)
+        self.style.configure(
+            "Cyan.TCheckbutton",
+            background="#13121f",
+            foreground="#00f0ff",
+            font=("Segoe UI", 9, "bold"),
+            indicatorcolor="#1c1a2e",
+            indicatorbackground="#1c1a2e",
+            focuscolor="#13121f"
+        )
+        self.style.map(
+            "Cyan.TCheckbutton",
+            background=[("active", "#13121f")],
+            foreground=[("active", "#38bdf8")],
+            indicatorbackground=[("selected", "#00f0ff"), ("active", "#1c1a2e")]
+        )
 
     def build_ui_layout(self):
         # Master Container Grid configuration
@@ -163,21 +283,17 @@ class AnonyVoxApp:
         header_frame.grid(row=0, column=0, columnspan=2, sticky="ew", padx=20, pady=10)
         header_frame.grid_propagate(False)
 
-        title_label = tk.Label(
+        title_label = ttk.Label(
             header_frame,
             text="ANONYVOX",
-            font=("Segoe UI", 24, "bold"),
-            fg="#ff007f",  # Neon Pink
-            bg="#0b0a12"
+            style="Header.TLabel"
         )
         title_label.pack(anchor="w")
 
-        subtitle_label = tk.Label(
+        subtitle_label = ttk.Label(
             header_frame,
-            text="AI-POWERED REAL-TIME VOICE MORPHING & CRYPTOGRAPHIC BLUR ENGINE",
-            font=("Segoe UI", 9, "bold"),
-            fg="#00f0ff",  # Neon Cyan
-            bg="#0b0a12"
+            text="AI-POWERED REAL-TIME VOICE MORPHING & SYSTEM MONITORING ENGINE",
+            style="Subtitle.TLabel"
         )
         subtitle_label.pack(anchor="w")
 
@@ -199,25 +315,23 @@ class AnonyVoxApp:
         hw_frame.pack(fill="x", pady=10, ipady=5)
         hw_frame.columnconfigure(1, weight=1)
 
-        tk.Label(hw_frame, text="Input Microphone:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(hw_frame, text="Input Microphone:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
         self.input_dropdown = ttk.Combobox(hw_frame, textvariable=self.input_device_var, state="readonly")
         self.input_dropdown.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
         self.input_dropdown.bind("<<ComboboxSelected>>", self.on_device_changed)
 
-        tk.Label(hw_frame, text="Output Speaker/VAC:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(hw_frame, text="Output Speaker/VAC:").grid(row=1, column=0, sticky="w", padx=10, pady=5)
         self.output_dropdown = ttk.Combobox(hw_frame, textvariable=self.output_device_var, state="readonly")
         self.output_dropdown.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
         self.output_dropdown.bind("<<ComboboxSelected>>", self.on_device_changed)
 
         # Monitor Output Checkbox
-        self.monitor_chk = tk.Checkbutton(
+        self.monitor_chk = ttk.Checkbutton(
             hw_frame, 
             text="Monitor Output (Hear Self / Echo)", 
             variable=self.monitor_audio_var,
             onvalue=True, offvalue=False,
-            font=("Segoe UI", 9, "bold"),
-            fg="#00f0ff", bg="#13121f", selectcolor="#13121f",
-            activebackground="#13121f", activeforeground="#00f0ff"
+            style="Cyan.TCheckbutton"
         )
         self.monitor_chk.grid(row=2, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
@@ -244,25 +358,23 @@ class AnonyVoxApp:
         rvc_frame.columnconfigure(1, weight=1)
 
         # Enable/Disable RVC
-        self.rvc_chk = tk.Checkbutton(
+        self.rvc_chk = ttk.Checkbutton(
             rvc_frame, 
             text="Activate AI Voice Morphing Pipeline", 
             variable=self.rvc_enabled_var,
             onvalue=True, offvalue=False,
-            font=("Segoe UI", 9, "bold"),
-            fg="#ff007f", bg="#13121f", selectcolor="#13121f",
-            activebackground="#13121f", activeforeground="#ff007f",
+            style="TCheckbutton",
             command=self.on_rvc_toggle
         )
         self.rvc_chk.grid(row=0, column=0, columnspan=2, sticky="w", padx=10, pady=5)
 
-        tk.Label(rvc_frame, text="Select RVC Model:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(rvc_frame, text="Select RVC Model:").grid(row=1, column=0, sticky="w", padx=10, pady=5)
         self.model_dropdown = ttk.Combobox(rvc_frame, textvariable=self.model_var, state="readonly")
         self.model_dropdown.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
         self.model_dropdown.bind("<<ComboboxSelected>>", self.on_model_selected)
 
         # Pitch scale slider component (-12 to +12 semitones)
-        tk.Label(rvc_frame, text="Pitch Transposition:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(rvc_frame, text="Pitch Transposition:").grid(row=2, column=0, sticky="w", padx=10, pady=5)
         self.pitch_slider_frame = tk.Frame(rvc_frame, bg="#13121f")
         self.pitch_slider_frame.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
         self.pitch_slider_frame.columnconfigure(0, weight=1)
@@ -275,12 +387,12 @@ class AnonyVoxApp:
         )
         self.pitch_slider.grid(row=0, column=0, sticky="ew")
         
-        self.pitch_lbl = tk.Label(self.pitch_slider_frame, text="0 st", font=("Segoe UI", 9, "bold"), fg="#ff007f", bg="#13121f", width=6)
+        self.pitch_lbl = ttk.Label(self.pitch_slider_frame, text="0 st", style="Pink.TLabel", width=6)
         self.pitch_lbl.grid(row=0, column=1, padx=5)
         self.pitch_val.trace_add("write", lambda *args: self.pitch_lbl.config(text=f"{self.pitch_val.get():+d} st"))
 
         # Voice Profile Presets Dropdown
-        tk.Label(rvc_frame, text="Vocal Preset:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(rvc_frame, text="Vocal Preset:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
         self.preset_var = tk.StringVar(value="Select Preset...")
         self.preset_dropdown = ttk.Combobox(rvc_frame, textvariable=self.preset_var, values=["Select Preset...", "Deep Male", "High Female", "Astral Echo", "Overdrive Cyborg", "Default Reset"], state="readonly")
         self.preset_dropdown.grid(row=3, column=1, sticky="ew", padx=10, pady=5)
@@ -298,7 +410,7 @@ class AnonyVoxApp:
         si_frame.columnconfigure(1, weight=1)
 
         # Effect 1: Spectral Inversion
-        tk.Label(si_frame, text="Spectral Inversion:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=0, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(si_frame, text="Spectral Inversion:").grid(row=0, column=0, sticky="w", padx=10, pady=5)
         self.si_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.si_slider_frame.grid(row=0, column=1, sticky="ew", padx=10, pady=5)
         self.si_slider_frame.columnconfigure(0, weight=1)
@@ -309,12 +421,12 @@ class AnonyVoxApp:
             activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.si_slider.grid(row=0, column=0, sticky="ew")
-        self.si_lbl = tk.Label(self.si_slider_frame, text="0.00", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
+        self.si_lbl = ttk.Label(self.si_slider_frame, text="0.00", style="Cyan.TLabel", width=6)
         self.si_lbl.grid(row=0, column=1, padx=5)
         self.spectral_inversion_val.trace_add("write", lambda *args: self.si_lbl.config(text=f"{self.spectral_inversion_val.get():.2f}"))
 
         # Effect 2: Ring Modulation
-        tk.Label(si_frame, text="Ring Modulator:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=1, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(si_frame, text="Ring Modulator:").grid(row=1, column=0, sticky="w", padx=10, pady=5)
         self.ring_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.ring_slider_frame.grid(row=1, column=1, sticky="ew", padx=10, pady=5)
         self.ring_slider_frame.columnconfigure(0, weight=1)
@@ -325,12 +437,12 @@ class AnonyVoxApp:
             activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.ring_slider.grid(row=0, column=0, sticky="ew")
-        self.ring_lbl = tk.Label(self.ring_slider_frame, text="0 Hz", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
+        self.ring_lbl = ttk.Label(self.ring_slider_frame, text="0 Hz", style="Cyan.TLabel", width=6)
         self.ring_lbl.grid(row=0, column=1, padx=5)
         self.ring_mod_val.trace_add("write", lambda *args: self.ring_lbl.config(text=f"{self.ring_mod_val.get()} Hz"))
 
         # Effect 3: Tremolo
-        tk.Label(si_frame, text="Vocal Tremolo:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=2, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(si_frame, text="Vocal Tremolo:").grid(row=2, column=0, sticky="w", padx=10, pady=5)
         self.trem_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.trem_slider_frame.grid(row=2, column=1, sticky="ew", padx=10, pady=5)
         self.trem_slider_frame.columnconfigure(0, weight=1)
@@ -341,12 +453,12 @@ class AnonyVoxApp:
             activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.trem_slider.grid(row=0, column=0, sticky="ew")
-        self.trem_lbl = tk.Label(self.trem_slider_frame, text="0.00", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
+        self.trem_lbl = ttk.Label(self.trem_slider_frame, text="0.00", style="Cyan.TLabel", width=6)
         self.trem_lbl.grid(row=0, column=1, padx=5)
         self.tremolo_depth_val.trace_add("write", lambda *args: self.trem_lbl.config(text=f"{self.tremolo_depth_val.get():.2f}"))
 
         # Effect 4: Vocal Distortion
-        tk.Label(si_frame, text="Overdrive Dist:", font=("Segoe UI", 9), fg="#e2e8f0", bg="#13121f").grid(row=3, column=0, sticky="w", padx=10, pady=5)
+        ttk.Label(si_frame, text="Overdrive Dist:").grid(row=3, column=0, sticky="w", padx=10, pady=5)
         self.dist_slider_frame = tk.Frame(si_frame, bg="#13121f")
         self.dist_slider_frame.grid(row=3, column=1, sticky="ew", padx=10, pady=5)
         self.dist_slider_frame.columnconfigure(0, weight=1)
@@ -357,7 +469,7 @@ class AnonyVoxApp:
             activebackground="#00f0ff", highlightthickness=0, bd=0
         )
         self.dist_slider.grid(row=0, column=0, sticky="ew")
-        self.dist_lbl = tk.Label(self.dist_slider_frame, text="1.0x", font=("Segoe UI", 9, "bold"), fg="#00f0ff", bg="#13121f", width=6)
+        self.dist_lbl = ttk.Label(self.dist_slider_frame, text="1.0x", style="Cyan.TLabel", width=6)
         self.dist_lbl.grid(row=0, column=1, padx=5)
         self.distortion_val.trace_add("write", lambda *args: self.dist_lbl.config(text=f"{self.distortion_val.get():.1f}x"))
 
@@ -464,13 +576,12 @@ class AnonyVoxApp:
         )
         log_frame.pack(fill="x", pady=10)
 
-        self.status_label = tk.Label(
+        self.status_label = ttk.Label(
             log_frame, 
-            text="System Initialized. Idle.", 
-            font=("Segoe UI", 9, "bold"),
-            fg="#a78bfa", bg="#13121f", anchor="w"
+            text="Initializing AI Modulator Engine dependencies...", 
+            style="Status.TLabel"
         )
-        self.status_label.pack(fill="x", padx=10, pady=5)
+        self.status_label.pack(fill="x", padx=10, pady=5, anchor="w")
 
         self.log_text = tk.Text(
             log_frame, height=5, font=("Courier New", 8),
@@ -479,7 +590,7 @@ class AnonyVoxApp:
         self.log_text.pack(fill="x", padx=10, pady=5)
         
         # Load initialization metrics
-        self.log_diagnostic_info()
+        self.update_log("AnonyVox GUI Initialized. Preparing core systems...")
 
     def log_diagnostic_info(self):
         self.update_log("AnonyVox Core Audio Module Initializing...")
@@ -515,7 +626,7 @@ class AnonyVoxApp:
             self.model_dropdown['values'] = ["No models found"]
             self.model_dropdown.set("No models found")
             self.model_dropdown.config(state="disabled")
-            self.status_label.config(text="Warning: Drop some RVC models in models/ folder.", fg="#ef4444")
+            self.status_label.config(text="Warning: Drop some RVC models in models/ folder.", foreground="#ef4444")
             self.rvc_enabled_var.set(False)
             self.rvc_chk.config(state="disabled")
         else:
@@ -564,7 +675,7 @@ class AnonyVoxApp:
             
         if not self.rvc:
             self.model_dropdown.config(state="readonly")
-            self.status_label.config(text="⚠️ AI Modulator Unavailable (Dependencies missing)", fg="#ef4444")
+            self.status_label.config(text="⚠️ AI Modulator Unavailable (Dependencies missing)", foreground="#ef4444")
             self.update_log("RVC Modulator bypassed: rvc-python library is not loaded.")
             self.rvc_enabled_var.set(False)
             self.rvc_chk.config(state="disabled")
@@ -574,7 +685,7 @@ class AnonyVoxApp:
         index_path = self.get_model_index_pair(selected)
         
         self.model_dropdown.config(state="disabled")
-        self.status_label.config(text=f"Loading target model: {selected}...", fg="#06b6d4")
+        self.status_label.config(text=f"Loading target model: {selected}...", foreground="#06b6d4")
         self.update_log(f"Model selection changed. Loading file: {selected}")
         
         def load_thread():
@@ -610,7 +721,7 @@ class AnonyVoxApp:
         idx_name = os.path.basename(index_path) if index_path else "None"
         self.status_label.config(
             text=f"Ready • Loaded: {model_name} | GPU: {'CUDA:0' if self.cuda_active else 'CPU'}",
-            fg="#06b6d4"
+            foreground="#06b6d4"
         )
         self.update_log(f"Mounted AI weights '{model_name}' successfully.")
         if index_path:
@@ -620,7 +731,7 @@ class AnonyVoxApp:
 
     def on_load_failed(self, model_name, err):
         self.model_dropdown.config(state="readonly")
-        self.status_label.config(text=f"RVC Load Error: {model_name}", fg="#ef4444")
+        self.status_label.config(text=f"RVC Load Error: {model_name}", foreground="#ef4444")
         self.update_log(f"Failed to load RVC Model weights {model_name}: {err}")
         messagebox.showerror("AnonyVox AI Engine Error", f"Failed to load model weights:\n{err}")
 
@@ -673,7 +784,7 @@ class AnonyVoxApp:
             self.tremolo_depth_val.set(0.0)
             self.distortion_val.set(1.0)
             
-        self.status_label.config(text=f"Preset Loaded: {preset}", fg="#a78bfa")
+        self.status_label.config(text=f"Preset Loaded: {preset}", foreground="#a78bfa")
 
     def auto_route_virtual_mic(self):
         found = False
@@ -713,7 +824,7 @@ class AnonyVoxApp:
             self.recorded_blocks = []
             self.record_btn.config(text="⏹️ STOP RECORDING", bg="#ff2a5f", fg="#ffffff")
             self.update_log("Recording started... Morphing output is being captured.")
-            self.status_label.config(text="Recording Active • Capturing Audio Output", fg="#ff2a5f")
+            self.status_label.config(text="Recording Active • Capturing Audio Output", foreground="#ff2a5f")
         else:
             self.is_recording = False
             self.record_btn.config(text="🔴 START RECORDING", bg="#1c1a2e", fg="#ff2a5f")
@@ -738,7 +849,7 @@ class AnonyVoxApp:
                 w.writeframes(pcm_data.tobytes())
                 
             self.root.after(0, lambda: self.update_log(f"SUCCESS: Recording saved to {filename}"))
-            self.root.after(0, lambda: self.status_label.config(text=f"Recording Saved: {filename}", fg="#00f0ff"))
+            self.root.after(0, lambda: self.status_label.config(text=f"Recording Saved: {filename}", foreground="#00f0ff"))
         except Exception as e:
             self.root.after(0, lambda: self.update_log(f"Recording save failed: {e}"))
             self.root.after(0, lambda: messagebox.showerror("Recorder Error", f"Failed to save recording:\n{e}"))
@@ -805,13 +916,13 @@ class AnonyVoxApp:
     def on_scramble_start(self, event):
         self.scramble_active = True
         self.scramble_btn.config(bg="#ff2a5f", fg="#ffffff", text="SCRAMBLER DEPLOYED (BLUR ACTIVE)")
-        self.status_label.config(text="AI Semantic Redaction Engaged • Scrambling PCM Frames", fg="#ff2a5f")
+        self.status_label.config(text="AI Semantic Redaction Engaged • Scrambling PCM Frames", foreground="#ff2a5f")
         self.update_log("ALERT: Scramble hotkey pressed. AI inference bypassed. Encrypted privacy carrier injected.")
 
     def on_scramble_stop(self, event):
         self.scramble_active = False
         self.scramble_btn.config(bg="#1c1a2e", fg="#ff2a5f", text="HOLD TO SCRAMBLE VOICE")
-        self.status_label.config(text="Ready • Modulator Online", fg="#00f0ff")
+        self.status_label.config(text="Ready • Modulator Online", foreground="#00f0ff")
         self.update_log("Scramble hotkey released. Duplex AI inference loop resumed.")
 
     def toggle_engine(self):
@@ -880,7 +991,7 @@ class AnonyVoxApp:
             self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#ff2a5f"))
             
             self.update_log("Duplex Input/Output streams ENGAGED.")
-            self.status_label.config(text="Audio Modulator Active • Dual-Stream Routing Engaged", fg="#00f0ff")
+            self.status_label.config(text="Audio Modulator Active • Dual-Stream Routing Engaged", foreground="#00f0ff")
         except Exception as e:
             self.update_log(f"Stream startup failure: {e}")
             messagebox.showerror("Engine Failure", f"Sounddevice failed to bind stream configuration:\n{e}")
@@ -941,7 +1052,7 @@ class AnonyVoxApp:
         self.start_btn.bind("<Leave>", lambda e: self.start_btn.config(bg="#00f0ff"))
         
         self.update_log("Duplex Audio stream DISENGAGED.")
-        self.status_label.config(text="System Stopped. Idle.", fg="#94a3b8")
+        self.status_label.config(text="System Stopped. Idle.", foreground="#94a3b8")
 
     def input_callback(self, indata, frames, time_info, status):
         """Native sounddevice input thread callback."""
@@ -1227,9 +1338,12 @@ class AnonyVoxApp:
         # Map values to visualizer coordinate grid
         n_samples = len(data)
         if n_samples > 0:
-            # Downsample to width coordinates
-            for x in range(width):
-                idx = int(x * n_samples / width)
+            # Downsample to a fixed maximum number of points (e.g. 128) to avoid performance issues
+            # on larger windows/high-DPI screens due to spline interpolation complexity (smooth=True).
+            num_points = min(width, 128)
+            for i in range(num_points):
+                x = (i / (num_points - 1)) * width if num_points > 1 else 0
+                idx = int(i * n_samples / num_points)
                 if idx < n_samples:
                     val = data[idx]
                     y = center_y - (val * center_y * 0.85)
