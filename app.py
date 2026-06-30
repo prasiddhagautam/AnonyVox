@@ -788,28 +788,63 @@ class AnonyVoxApp:
 
     def auto_route_virtual_mic(self):
         found = False
-        for friendly_name, idx in self.device_name_to_index.items():
-            if "cable" in friendly_name.lower() or "virtual" in friendly_name.lower() or "vac" in friendly_name.lower():
-                if friendly_name in self.output_dropdown['values']:
-                    self.output_device_var.set(friendly_name)
-                    found = True
-                    self.update_log(f"Auto-routed output to Virtual Audio Cable: {friendly_name}")
-                    self.on_device_changed()
-                    
-                    messagebox.showinfo(
-                        "Virtual Mic Auto-Route Active",
-                        f"Routed morphed audio output to: \n'{friendly_name}'\n\n"
-                        "To make the OS and communication apps (Discord, Zoom, etc.) receive the morphed voice:\n"
-                        "1. Open your Sound Control Panel or app Voice Settings.\n"
-                        "2. Set the INPUT device (Microphone) to 'CABLE Output (VB-Audio Virtual Cable)'.\n"
-                        "3. Your morphed voice is now routed directly as your virtual microphone!"
-                    )
+        target_name = None
+        device_type = None  # "cable" or "voicemeeter"
+        
+        # 1. First priority: Look for a dedicated VB-Cable or Virtual Audio Cable
+        for friendly_name in self.output_dropdown['values']:
+            fname_lower = friendly_name.lower()
+            if "cable" in fname_lower or "vac" in fname_lower or ("virtual" in fname_lower and "audio" in fname_lower and "voicemeeter" not in fname_lower):
+                target_name = friendly_name
+                device_type = "cable"
+                break
+                
+        # 2. Second priority: Look for Voicemeeter Input
+        if not target_name:
+            for friendly_name in self.output_dropdown['values']:
+                fname_lower = friendly_name.lower()
+                if "voicemeeter" in fname_lower and "input" in fname_lower and "aux" not in fname_lower:
+                    target_name = friendly_name
+                    device_type = "voicemeeter"
                     break
+            # Fallback to any Voicemeeter if specific Input not found
+            if not target_name:
+                for friendly_name in self.output_dropdown['values']:
+                    if "voicemeeter" in friendly_name.lower():
+                        target_name = friendly_name
+                        device_type = "voicemeeter"
+                        break
+
+        if target_name:
+            self.output_device_var.set(target_name)
+            found = True
+            self.update_log(f"Auto-routed output to virtual sound source: {target_name}")
+            self.on_device_changed()
+            
+            if device_type == "cable":
+                messagebox.showinfo(
+                    "Virtual Mic Auto-Route Active",
+                    f"Routed morphed audio output to: \n'{target_name}'\n\n"
+                    "To make communication apps (Discord, Zoom, etc.) receive the morphed voice:\n"
+                    "1. Open your Sound Control Panel or app Voice Settings.\n"
+                    "2. Set the INPUT device (Microphone) to 'CABLE Output (VB-Audio Virtual Cable)'.\n"
+                    "3. Your morphed voice is now routed directly as your virtual microphone!"
+                )
+            elif device_type == "voicemeeter":
+                messagebox.showinfo(
+                    "Voicemeeter Auto-Route Active",
+                    f"Routed morphed audio output to: \n'{target_name}'\n\n"
+                    "To make communication apps (Discord, Zoom, etc.) receive the morphed voice:\n"
+                    "1. Open Voicemeeter and ensure the 'A1' output is routed to your physical headphones/speakers so you can hear yourself if needed.\n"
+                    "2. In the Virtual Input channel (under the Voicemeeter VAIO row where the morphed audio is received), make sure B1 (or B2/B3 depending on the bus) is activated.\n"
+                    "3. In Discord/Zoom voice settings, set your INPUT device (Microphone) to 'Voicemeeter Output' (B1) or 'Voicemeeter Aux Output' (B2)."
+                )
+        
         if not found:
-            self.update_log("Virtual Mic Auto-Route failed: No VB-Audio Cable detected.")
+            self.update_log("Virtual Mic Auto-Route failed: No VB-Audio Cable or Voicemeeter detected.")
             messagebox.showwarning(
                 "Virtual Cable Helper",
-                "No Virtual Audio Cable was detected on your system.\n\n"
+                "No Virtual Audio Cable or Voicemeeter mixer was detected on your system.\n\n"
                 "To route your morphed voice to Discord or games, you need to install a virtual audio driver.\n\n"
                 "Recommended: Download free 'VB-CABLE Driver' from vb-audio.com, install it, and refresh hardware!"
             )
